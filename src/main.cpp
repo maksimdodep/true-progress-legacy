@@ -1,28 +1,44 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/CCLabelBMFont.hpp>
+#include <Geode/modify/PlayLayer.hpp>
 
 using namespace geode::prelude;
 
-class $modify(CCLabelBMFont) {
-    void setString(const char* text) {
-        std::string str(text);
+class $modify(PlayLayer) {
+    void updateProgressLabel() {
+        // 1. Сначала даем игре обновиться в штатном режиме
+        PlayLayer::updateProgressLabel();
 
-        // Проверяем, что строка заканчивается на % и не содержит дефис
-        if (!str.empty() && str.back() == '%' && str.find('-') == std::string::npos) {
+        // 2. Безопасно проверяем UI-слой и счетчик процентов
+        if (m_uiLayer && m_uiLayer->m_percentLabel) {
             
-            // Фильтр по размеру! Верхний главный счетчик имеет масштаб 1.0 (или около того), 
-            // а мелкие плашки модов в углах — меньше 0.4.
-            if (this->getScale() > 0.4f) {
+            // ЖЕСТКАЯ ПРОВЕРКА: Проверяем, существует ли физический объект StartPos на уровне прямо сейчас.
+            // Если игрок идет с обычного начала уровня, m_startPosition будет равен nullptr!
+            if (m_startPosition != nullptr) {
                 
-                // Для теста пишем старт как 0%
-                std::string newText = "0% - " + str;
+                double startPercent = 0.0;
                 
-                CCLabelBMFont::setString(newText.c_str());
-                return;
-            }
-        }
+                // Берем координату X из Cocos-позиции физического объекта стартпоза
+                float startX = m_startPosition->getPositionX();
 
-        // Все остальные надписи и мелкие моды пропускаем без изменений
-        CCLabelBMFont::setString(text);
+                // Высчитываем реальный процент старта от длины уровня
+                if (m_levelLength > 0.0f) {
+                    startPercent = (startX / m_levelLength) * 100.0;
+                }
+
+                // Защита границ, чтобы не вылезло -0% или 101%
+                if (startPercent < 0.0) startPercent = 0.0;
+                if (startPercent > 100.0) startPercent = 100.0;
+
+                // Получаем текущий процент рана игрока
+                int currentPercent = this->getCurrentPercent();
+
+                // Форматируем строку: [Реальный Старт]% - [Текущий]%
+                std::string formatStr = fmt::format("{:.0f}% - {}%", startPercent, currentPercent);
+
+                // Заменяем текст СТРОГО на главном счетчике игры верхнего слоя
+                m_uiLayer->m_percentLabel->setString(formatStr.c_str());
+            }
+            // ЕСЛИ СТАРТПОЗА НЕТ: код просто засыпает, и игра выводит дефолтные проценты без нуля!
+        }
     }
 };
