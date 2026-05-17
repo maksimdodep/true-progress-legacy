@@ -5,54 +5,80 @@ using namespace geode::prelude;
 
 class $modify(PlayLayer) {
     void updateProgressLabel() {
-        // 1. Даем игре обновиться в штатном режиме
+        // 1. Даем игре обновиться штатно
         PlayLayer::updateProgressLabel();
 
-        // 2. Проверяем UI-слой и счетчик процентов
-        if (m_uiLayer && m_uiLayer->m_percentageLabel) {
-            
-            // Проверяем, есть ли вообще стартпозы на уровне
-            if (m_startPosObjects && m_startPosObjects->count() > 0) {
-                
-                double startPercent = 0.0;
-                CCNode* activeStartPos = nullptr;
+        // 2. Проверяем наличие интерфейса и игрока
+        if (!m_uiLayer || !m_player1) return;
 
-                // Проверяем, активирован ли конкретный стартпоз игроком
-                if (m_activatedStartPos) {
-                    activeStartPos = reinterpret_cast<CCNode*>(m_activatedStartPos);
-                } else {
-                    // Если нет явно активного, берем первый доступный из массива
-                    auto firstObj = m_startPosObjects->objectAtIndex(0);
-                    if (firstObj) {
-                        activeStartPos = reinterpret_cast<CCNode*>(firstObj);
+        // Ищем стандартный текстовый счетчик процентов на экране
+        CCLabelBMFont* percentLabel = nullptr;
+        
+        // Перебираем все элементы на UI-слое, чтобы найти текстовое поле процентов
+        auto children = m_uiLayer->getChildren();
+        if (children) {
+            for (int i = 0; i < children->count(); ++i) {
+                auto child = card_cast<CCLabelBMFont*>(children->objectAtIndex(i));
+                // Текстовые проценты в GD обычно имеют определенный тег или позицию, 
+                // но самый надежный способ — проверить, заканчивается ли текст на '%'
+                if (child) {
+                    std::string text = child->getString();
+                    if (!text.empty() && text.back() == '%') {
+                        percentLabel = child;
+                        break;
                     }
                 }
+            }
+        }
 
-                // Если стартпоз успешно определен, считаем его X координату
-                if (activeStartPos) {
-                    float startX = activeStartPos->getPositionX();
-                    if (m_levelLength > 0.0f) {
-                        startPercent = (startX / m_levelLength) * 100.0;
+        // Если счетчик на экране найден
+        if (percentLabel) {
+            double startPercent = 0.0;
+            bool hasStartPos = false;
+            float startX = 0.0f;
+
+            // Ищем StartPos объекты на самом уровне среди всех объектов слоя
+            auto objects = this->getChildren();
+            if (objects) {
+                for (int i = 0; i < objects->count(); ++i) {
+                    auto obj = objects->objectAtIndex(i);
+                    if (obj) {
+                        // В движке GD объекты StartPos имеют определенный тип (обычно StartPosObject)
+                        // Проверим имя класса объекта, чтобы точно найти стартпоз
+                        std::string className = typeid(*obj).name();
+                        if (className.find("StartPosObject") != std::string::npos) {
+                            auto node = reinterpret_cast<CCNode*>(obj);
+                            // Для простоты берем первый найденный или активный стартпоз
+                            startX = node->getPositionX();
+                            hasStartPos = true;
+                            break; 
+                        }
                     }
                 }
+            }
 
-                // Ограничиваем рамки процентов от 0 до 100
+            // Если на уровне реально используется стартпоз
+            if (hasStartPos) {
+                if (m_levelLength > 0.0f) {
+                    startPercent = (startX / m_levelLength) * 100.0;
+                }
+
                 if (startPercent < 0.0) startPercent = 0.0;
                 if (startPercent > 100.0) startPercent = 100.0;
 
-                // Считаем точный ТЕКУЩИЙ процент игрока с дробной частью
+                // Считаем точный текущий процент игрока
                 double currentPercent = 0.0;
-                if (m_player1 && m_levelLength > 0.0f) {
+                if (m_levelLength > 0.0f) {
                     currentPercent = (m_player1->getPositionX() / m_levelLength) * 100.0;
                 }
                 if (currentPercent < 0.0) currentPercent = 0.0;
                 if (currentPercent > 100.0) currentPercent = 100.0;
 
-                // Форматируем строку с точностью до одной десятой: "39.4%-52.8%"
+                // Собираем строку с десятыми долями: "39.4%-52.8%"
                 std::string formatStr = fmt::format("{:.1f}%-{:.1f}%", startPercent, currentPercent);
 
-                // Выводим текст на стандартное верхнее место по центру
-                m_uiLayer->m_percentageLabel->setString(formatStr.c_str());
+                // Меняем текст на экране
+                percentLabel->setString(formatStr.c_str());
             }
         }
     }
