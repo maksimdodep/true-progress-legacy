@@ -5,24 +5,29 @@ using namespace geode::prelude;
 
 class $modify(PlayLayer) {
     void updateProgressLabel() {
-        // 1. Сначала даем игре обновиться в штатном режиме
+        // 1. Даем игре обновиться в штатном режиме
         PlayLayer::updateProgressLabel();
 
-        // 2. Безопасно проверяем UI-слой и счетчик процентов
-        if (m_uiLayer && m_uiLayer->m_percentLabel) {
+        // 2. Проверяем UI-слой и счетчик процентов с правильным именем m_percentageLabel
+        if (m_uiLayer && m_uiLayer->m_percentageLabel) {
             
-            // ЖЕСТКАЯ ПРОВЕРКА: Проверяем, существует ли физический объект StartPos на уровне прямо сейчас.
-            // Если игрок идет с обычного начала уровня, m_startPosition будет равен nullptr!
-            if (m_startPosition != nullptr) {
+            // ПРОВЕРКА: Проверяем, есть ли на уровне активированные объекты StartPos
+            if (m_startPosObjects && m_startPosObjects->count() > 0) {
                 
                 double startPercent = 0.0;
                 
-                // Берем координату X из Cocos-позиции физического объекта стартпоза
-                float startX = m_startPosition->getPositionX();
+                // Достаем самый первый объект StartPos из массива игры
+                auto startPosObj = static_cast<CCObject*>(m_startPosObjects->objectAtIndex(0));
+                
+                if (startPosObj) {
+                    // Принудительно приводим к типу ноды, чтобы забрать координату X
+                    auto node = static_cast<CCNode*>(startPosObj);
+                    float startX = node->getPositionX();
 
-                // Высчитываем реальный процент старта от длины уровня
-                if (m_levelLength > 0.0f) {
-                    startPercent = (startX / m_levelLength) * 100.0;
+                    // Высчитываем реальный процент старта от длины уровня
+                    if (m_levelLength > 0.0f) {
+                        startPercent = (startX / m_levelLength) * 100.0;
+                    }
                 }
 
                 // Защита границ, чтобы не вылезло -0% или 101%
@@ -35,10 +40,10 @@ class $modify(PlayLayer) {
                 // Форматируем строку: [Реальный Старт]% - [Текущий]%
                 std::string formatStr = fmt::format("{:.0f}% - {}%", startPercent, currentPercent);
 
-                // Заменяем текст СТРОГО на главном счетчике игры верхнего слоя
-                m_uiLayer->m_percentLabel->setString(formatStr.c_str());
+                // Заменяем текст на главном счетчике игры верхнего слоя
+                m_uiLayer->m_percentageLabel->setString(formatStr.c_str());
             }
-            // ЕСЛИ СТАРТПОЗА НЕТ: код просто засыпает, и игра выводит дефолтные проценты без нуля!
+            // ЕСЛИ СТАРТПОЗА НЕТ: код ничего не делает, и игра выводит дефолтные проценты!
         }
     }
 };
