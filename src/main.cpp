@@ -1,32 +1,28 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/PlayLayer.hpp>
+#include <Geode/modify/CCLabelBMFont.hpp>
 
 using namespace geode::prelude;
 
-class $modify(PlayLayer) {
-    // Возвращаем метод, который просит сам компилятор в логе
-    void updateProgressLabel() {
-        // 1. Запускаем оригинальный код игры
-        PlayLayer::updateProgressLabel();
+class $modify(CCLabelBMFont) {
+    void setString(const char* text) {
+        std::string str(text);
 
-        // 2. Проверяем наличие UI слоя и текстовой плашки процентов (m_percentLabel)
-        if (m_uiLayer && m_uiLayer->m_percentLabel) {
-            
-            // Если включен режим теста или практики
-            if (m_isTestMode || m_isPracticeMode) {
+        // Если строка не пустая и заканчивается на знак процента (это наш счетчик!)
+        if (!str.empty() && str.back() == '%') {
+            // Проверяем, что это просто число процентов, а не левый текст
+            // (в старых версиях строка имеет вид "11%" или "11.3%")
+            if (str.find('-') == std::string::npos) { 
                 
-                // Чтобы не ломать компилятор об объект настроек, берем текущий процент
-                int currentPercent = this->getCurrentPercent();
+                // Для теста пишем старт как 0%
+                std::string newText = "0% - " + str;
                 
-                // Для теста выведем старт как 0% (или текущий), пока не найдем точное имя переменной StartPos
-                int startPercent = 0; 
-
-                // Форматируем строку: [Старт]% - [Текущий]%
-                std::string formatStr = fmt::format("{}% - {}%", startPercent, currentPercent);
-
-                // Заменяем текст на экране через правильное имя m_percentLabel
-                m_uiLayer->m_percentLabel->setString(formatStr.c_str());
+                // Вызываем оригинальный метод с нашим новым текстом
+                CCLabelBMFont::setString(newText.c_str());
+                return;
             }
         }
+
+        // Во всех остальных случаях отдаем текст игре в штатном режиме
+        CCLabelBMFont::setString(text);
     }
 };
