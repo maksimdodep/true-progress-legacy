@@ -4,58 +4,51 @@
 using namespace geode::prelude;
 
 class $modify(PlayLayer) {
-    // Используем метод update, так как он гарантированно вызывается каждый кадр
     void update(float dt) {
-        // 1. Вызываем оригинальный метод, чтобы игра жила своей жизнью
+        // 1. Штатное обновление игры
         PlayLayer::update(dt);
 
-        // Safe check: проверяем, что UI и игрок загрузились
+        // Проверяем UI и игрока
         if (!m_uiLayer || !m_player1) return;
 
-        // В Geode 2.2074 поле лейбла процентов в UILayer называется m_percentageLabel
-        // Проверяем его существование
-        if (m_uiLayer->m_percentageLabel) {
+        // Исправлено: в этой версии поле называется m_percentLabel
+        if (m_uiLayer->m_percentLabel) {
             
-            // Проверяем наличие массива стартпозов уровня (m_startPosObjects)
-            if (m_startPosObjects && m_startPosObjects->count() > 0) {
-                
-                double startPercent = 0.0;
-                CCNode* activeStartPos = nullptr;
+            double startPercent = 0.0;
+            CCNode* activeStartPosNode = nullptr;
 
-                // В старых биндингах m_activatedStartPos доступен напрямую
-                if (m_activatedStartPos) {
-                    activeStartPos = reinterpret_cast<CCNode*>(m_activatedStartPos);
-                } else {
-                    // Если конкретный не выбран, берем первый из массива
-                    auto firstObj = m_startPosObjects->objectAtIndex(0);
-                    if (firstObj) {
-                        activeStartPos = reinterpret_cast<CCNode*>(firstObj);
-                    }
-                }
+            // Исправлено: используем m_activeStartPos (как подсказал компилятор)
+            if (m_activeStartPos) {
+                activeStartPosNode = reinterpret_cast<CCNode*>(m_activeStartPos);
+            }
 
-                // Считаем стартовую позицию
-                if (activeStartPos && m_levelLength > 0.0f) {
-                    float startX = activeStartPos->getPositionX();
-                    startPercent = (startX / m_levelLength) * 100.0;
-                }
+            // Если активный стартпоз найден, считаем проценты от него
+            if (activeStartPosNode && m_levelLength > 0.0f) {
+                float startX = activeStartPosNode->getPositionX();
+                startPercent = (startX / m_levelLength) * 100.0;
+            }
 
-                // Ограничиваем рамки
-                if (startPercent < 0.0) startPercent = 0.0;
-                if (startPercent > 100.0) startPercent = 100.0;
+            // Считаем точный текущий процент игрока с дробной частью
+            double currentPercent = 0.0;
+            if (m_levelLength > 0.0f) {
+                currentPercent = (m_player1->getPositionX() / m_levelLength) * 100.0;
+            }
 
-                // Считаем точный ТЕКУЩИЙ прогресс игрока в реальном времени
-                double currentPercent = 0.0;
-                if (m_levelLength > 0.0f) {
-                    currentPercent = (m_player1->getPositionX() / m_levelLength) * 100.0;
-                }
-                if (currentPercent < 0.0) currentPercent = 0.0;
-                if (currentPercent > 100.0) currentPercent = 100.0;
+            // Защита от выхода за границы 0-100%
+            if (startPercent < 0.0) startPercent = 0.0;
+            if (startPercent > 100.0) startPercent = 100.0;
+            if (currentPercent < 0.0) currentPercent = 0.0;
+            if (currentPercent > 100.0) currentPercent = 100.0;
 
-                // Форматируем строку с точностью до десятых: "39.4%-52.8%"
+            // Если игрок идет НЕ с начала уровня (выбран стартпоз)
+            if (startPercent > 0.01) {
+                // Форматируем строку: "39.4%-52.8%"
                 std::string formatStr = fmt::format("{:.1f}%-{:.1f}%", startPercent, currentPercent);
-
-                // Напрямую подменяем текст в оригинальном игровом счетчике
-                m_uiLayer->m_percentageLabel->setString(formatStr.c_str());
+                m_uiLayer->m_percentLabel->setString(formatStr.c_str());
+            } else {
+                // Если стартпоза нет, выводим просто текущий точный процент "52.8%"
+                std::string formatStr = fmt::format("{:.1f}%", currentPercent);
+                m_uiLayer->m_percentLabel->setString(formatStr.c_str());
             }
         }
     }
