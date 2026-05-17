@@ -22,3 +22,9 @@ jobs:
         with:
           bindings: geode-sdk/bindings
           bindings-ref: main
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geode-mod-package
+          path: build/*.geode
