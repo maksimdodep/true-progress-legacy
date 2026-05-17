@@ -8,18 +8,20 @@ class $modify(PlayLayer) {
         // 1. Штатное обновление игры
         PlayLayer::update(dt);
 
-        // Защита от вылета
+        // Защита от вылета (проверяем базовые объекты)
         if (!m_uiLayer || !m_player1) return;
 
-        // ШАГ 1: Динамически ищем счетчик процентов на экране интерфейса
+        // Ищем текстовый счетчик процентов на экране интерфейса
         CCLabelBMFont* percentLabel = nullptr;
+        
         auto children = m_uiLayer->getChildren();
         if (children) {
             for (int i = 0; i < children->count(); ++i) {
-                // Безопасное приведение типа объекта через старый метод
-                auto child = reinterpret_cast<CCLabelBMFont*>(children->objectAtIndex(i));
-                if (child && child->getObjType() == cocos2d::CCObjectType::kCCObjectTypeNode) {
+                // Безопасное динамическое приведение к типу текстового лейбла
+                auto child = dynamic_cast<CCLabelBMFont*>(children->objectAtIndex(i));
+                if (child) {
                     std::string text = child->getString();
+                    // Ищем элемент, текст которого заканчивается на значок '%'
                     if (!text.empty() && text.back() == '%') {
                         percentLabel = child;
                         break;
@@ -32,35 +34,36 @@ class $modify(PlayLayer) {
         if (percentLabel) {
             double startPercent = 0.0;
 
-            // ШАГ 2: Считаем точный текущий процент кубика в реальном времени
+            // Считаем точный текущий процент кубика в реальном времени
             double currentPercent = 0.0;
             if (m_levelLength > 0.0f) {
                 currentPercent = (m_player1->getPositionX() / m_levelLength) * 100.0;
             }
 
-            // Ограничиваем рамки
+            // Ограничиваем рамки процентов от 0 до 100
             if (currentPercent < 0.0) currentPercent = 0.0;
             if (currentPercent > 100.0) currentPercent = 100.0;
 
-            // ШАГ 3: Форматируем строку в зависимости от прогресса
-            // Если игрок идет с кастомного места, дефолтный счетчик игры (целый) не равен текущему точному
+            // Проверяем, идет ли игрок с начала уровня или со стартпоза
             int gamePercent = this->getCurrentPercent(); 
             
-            // Если игра думает, что мы на 0%, а кубик улетел дальше (значит активен стартпоз)
+            // Если дефолтная игра думает, что прогресс 0%, но кубик уже пролетел вперед, 
+            // значит, на уровне активирован стартпоз
             if (gamePercent == 0 && m_player1->getPositionX() > 100.0f) {
-                // Рассчитываем примерный стартпоз от текущего положения минус игровой прогресс
                 startPercent = currentPercent; 
             }
 
-            // Выводим кастомный текст "39.4%-52.8%" или просто "52.8%"
+            // Собираем кастомный текст строки
             std::string formatStr;
             if (startPercent > 0.5) {
+                // Если активен стартпоз: "39.4%-52.8%"
                 formatStr = fmt::format("{:.1f}%-{:.1f}%", startPercent, currentPercent);
             } else {
+                // Если стартпоза нет, просто выводим точный текущий процент: "52.8%"
                 formatStr = fmt::format("{:.1f}%", currentPercent);
             }
 
-            // Обновляем текст на экране
+            // Обновляем текст на экране игры
             percentLabel->setString(formatStr.c_str());
         }
     }
