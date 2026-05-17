@@ -8,42 +8,52 @@ class $modify(PlayLayer) {
         // 1. Даем игре обновиться в штатном режиме
         PlayLayer::updateProgressLabel();
 
-        // 2. Проверяем UI-слой и счетчик процентов с правильным именем m_percentageLabel
+        // 2. Проверяем UI-слой и счетчик процентов
         if (m_uiLayer && m_uiLayer->m_percentageLabel) {
             
-            // ПРОВЕРКА: Проверяем, есть ли на уровне активированные объекты StartPos
+            // Проверяем, есть ли вообще стартпозы на уровне
             if (m_startPosObjects && m_startPosObjects->count() > 0) {
                 
                 double startPercent = 0.0;
-                
-                // Достаем самый первый объект StartPos из массива игры
-                auto startPosObj = static_cast<CCObject*>(m_startPosObjects->objectAtIndex(0));
-                
-                if (startPosObj) {
-                    // Принудительно приводим к типу ноды, чтобы забрать координату X
-                    auto node = static_cast<CCNode*>(startPosObj);
-                    float startX = node->getPositionX();
+                CCNode* activeStartPos = nullptr;
 
-                    // Высчитываем реальный процент старта от длины уровня
+                // Проверяем, активирован ли конкретный стартпоз игроком
+                if (m_activatedStartPos) {
+                    activeStartPos = reinterpret_cast<CCNode*>(m_activatedStartPos);
+                } else {
+                    // Если нет явно активного, берем первый доступный из массива
+                    auto firstObj = m_startPosObjects->objectAtIndex(0);
+                    if (firstObj) {
+                        activeStartPos = reinterpret_cast<CCNode*>(firstObj);
+                    }
+                }
+
+                // Если стартпоз успешно определен, считаем его X координату
+                if (activeStartPos) {
+                    float startX = activeStartPos->getPositionX();
                     if (m_levelLength > 0.0f) {
                         startPercent = (startX / m_levelLength) * 100.0;
                     }
                 }
 
-                // Защита границ, чтобы не вылезло -0% или 101%
+                // Ограничиваем рамки процентов от 0 до 100
                 if (startPercent < 0.0) startPercent = 0.0;
                 if (startPercent > 100.0) startPercent = 100.0;
 
-                // Получаем текущий процент рана игрока
-                int currentPercent = this->getCurrentPercent();
+                // Считаем точный ТЕКУЩИЙ процент игрока с дробной частью
+                double currentPercent = 0.0;
+                if (m_player1 && m_levelLength > 0.0f) {
+                    currentPercent = (m_player1->getPositionX() / m_levelLength) * 100.0;
+                }
+                if (currentPercent < 0.0) currentPercent = 0.0;
+                if (currentPercent > 100.0) currentPercent = 100.0;
 
-                // Форматируем строку: [Реальный Старт]% - [Текущий]%
-                std::string formatStr = fmt::format("{:.0f}% - {}%", startPercent, currentPercent);
+                // Форматируем строку с точностью до одной десятой: "39.4%-52.8%"
+                std::string formatStr = fmt::format("{:.1f}%-{:.1f}%", startPercent, currentPercent);
 
-                // Заменяем текст на главном счетчике игры верхнего слоя
+                // Выводим текст на стандартное верхнее место по центру
                 m_uiLayer->m_percentageLabel->setString(formatStr.c_str());
             }
-            // ЕСЛИ СТАРТПОЗА НЕТ: код ничего не делает, и игра выводит дефолтные проценты!
         }
     }
 };
