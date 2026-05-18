@@ -9,26 +9,29 @@ class $modify(MyPlayLayer, PlayLayer) {
         float startX = 0.0f;
     };
 
-    // Ловим стартпоз в момент загрузки объектов уровня
-    void addObject(GameObject* obj) {
-        PlayLayer::addObject(obj);
-        if (obj) {
-            std::string className = typeid(*obj).name();
-            if (className.find("StartPosObject") != std::string::npos) {
-                m_fields->startX = obj->getPositionX();
+    // Перехватываем инициализацию уровня
+    bool init(GJGameLevel* level, bool usePracticeMode, bool isPlaytest) {
+        if (!PlayLayer::init(level, usePracticeMode, isPlaytest)) return false;
+
+        // В Geometry Dash, если активирован Стартпоз, игра создаёт настройки уровня на его основе.
+        // Мы проверяем настройки уровня. Если они указывают на кастомную точку, значит стартпоз активен!
+        if (m_levelSettings && m_levelSettings->m_startPos) {
+            auto spNode = reinterpret_cast<CCNode*>(m_levelSettings->m_startPos);
+            if (spNode) {
+                m_fields->startX = spNode->getPositionX();
                 m_fields->hasStartPos = true;
             }
         }
+        return true;
     }
 
-    // Использование postUpdate гарантирует, что наш код выполнится ПОСЛЕ того,
-    // как игра обновит и перезапишет стандартный текст процентов.
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
 
         // Стандартная защита от вылетов
         if (!m_uiLayer || !m_player1) return;
 
+        // Ищем текстовый счетчик процентов на экране интерфейса
         CCLabelBMFont* percentLabel = nullptr;
         auto children = m_uiLayer->getChildren();
         if (children) {
@@ -45,35 +48,38 @@ class $modify(MyPlayLayer, PlayLayer) {
             }
         }
 
-        // Если лейбл найден, принудительно перерисовываем его поверх логики игры
+        // Если лейбл найден, принудительно перезаписываем его
         if (percentLabel) {
             double startPercent = 0.0;
             double currentPercent = 0.0;
 
+            // Считаем текущий точный прогресс кубика
             if (m_levelLength > 0.0f) {
                 currentPercent = (m_player1->getPositionX() / m_levelLength) * 100.0;
             }
 
-            // Защита от выходов за границы
-            if (currentPercent < 0.0) currentPercent = 0.0;
-            if (currentPercent > 100.0) currentPercent = 100.0;
-
+            // Рассчитываем стартовый процент
             if (m_fields->hasStartPos && m_levelLength > 0.0f) {
                 startPercent = (m_fields->startX / m_levelLength) * 100.0;
             }
 
+            // Жесткая защита границ процентов от 0 до 100
             if (startPercent < 0.0) startPercent = 0.0;
             if (startPercent > 100.0) startPercent = 100.0;
+            if (currentPercent < 0.0) currentPercent = 0.0;
+            if (currentPercent > 100.0) currentPercent = 100.0;
 
             std::string formatStr;
-            // Условие: если стартпоз есть и мы физически находимся дальше него
-            if (m_fields->hasStartPos && startPercent > 0.5f && m_player1->getPositionX() >= m_fields->startX) {
+            // Исправлено: Убрали капризную проверку getPositionX() >= startX. 
+            // Если стартпоз на уровне был активирован (startPercent > 0.1), выводим двойной формат.
+            if (m_fields->hasStartPos && startPercent > 0.10) {
                 formatStr = fmt::format("{:.1f}%-{:.1f}%", startPercent, currentPercent);
             } else {
+                // Если стартпоза нет (или он в самом начале 0.0%), пишем просто точный текущий процент
                 formatStr = fmt::format("{:.1f}%", currentPercent);
             }
 
-            // Перезаписываем текст окончательно перед выводом кадра на экран
+            // Перезаписываем текст в самом конце кадра, побеждая стандартный счетчик игры
             percentLabel->setString(formatStr.c_str());
         }
     }
