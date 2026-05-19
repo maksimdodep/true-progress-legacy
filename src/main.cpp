@@ -33,13 +33,13 @@ class $modify(MyPlayLayer, PlayLayer) {
         if (currentPercent < 0.0) currentPercent = 0.0;
         if (currentPercent > 100.0) currentPercent = 100.0;
 
-        // 2. Идеальный захват стартовой позиции из настроек уровня 2.2074
+        // 2. Захват стартовой позиции из настроек уровня
         if (!m_fields->hasLockedStart && currentPercent > 0.01) {
             m_fields->hasLockedStart = true; // Выполняем строго один раз за попытку
 
             if (m_levelSettings && m_levelLength > 0.0f) {
-                // Вытаскиваем точную координату X объекта стартпоза из биндингов 2.2074
-                float exactStartX = m_levelSettings->m_startPosition.x;
+                // Исправлено: используем m_obPosition.x, как подсказал компилятор
+                float exactStartX = m_levelSettings->m_obPosition.x;
                 double exactStartPercent = (exactStartX / m_levelLength) * 100.0;
 
                 // Если стартпоз находится дальше начала уровня — активируем двойной счетчик
