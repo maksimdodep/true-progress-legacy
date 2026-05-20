@@ -7,13 +7,13 @@ class $modify(MyPlayLayer, PlayLayer) {
     struct Fields {
         bool isStartPos = false;
         double startPercent = 0.0;
-        bool hasLockedStart = false;
+        bool hasLockedStart = false; // Флаг, чтобы поймать стартпоз ровно ОДИН раз
     };
 
     void resetLevel() {
         PlayLayer::resetLevel();
 
-        // Сброс данных перед началом новой попытки
+        // Полный сброс при каждой смерти — возвращаем всё в исходное состояние
         m_fields->isStartPos = false;
         m_fields->startPercent = 0.0;
         m_fields->hasLockedStart = false;
@@ -24,7 +24,7 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         if (!m_uiLayer || !m_player1) return;
 
-        // 1. Считаем точный текущий прогресс кубика в реальном времени
+        // 1. Считаем точный текущий процент кубика прямо сейчас
         double currentPercent = 0.0;
         if (m_levelLength > 0.0f) {
             currentPercent = (m_player1->getPositionX() / m_levelLength) * 100.0;
@@ -33,24 +33,20 @@ class $modify(MyPlayLayer, PlayLayer) {
         if (currentPercent < 0.0) currentPercent = 0.0;
         if (currentPercent > 100.0) currentPercent = 100.0;
 
-        // 2. Захват стартовой позиции из настроек уровня
-        if (!m_fields->hasLockedStart && currentPercent > 0.01) {
-            m_fields->hasLockedStart = true; // Выполняем строго один раз за попытку
+        // ТВОЙ ЛЕГКИЙ ПУТЬ: Если кубик сдвинулся с абсолютного нуля (процент > 0.1%)
+        // и мы еще НЕ сохраняли стартовую точку для этой попытки
+        if (!m_fields->hasLockedStart && currentPercent > 0.1) {
+            m_fields->hasLockedStart = true; // Закрываем за собой дверь
 
-            if (m_levelSettings && m_levelLength > 0.0f) {
-                // Исправлено: используем m_obPosition.x, как подсказал компилятор
-                float exactStartX = m_levelSettings->m_obPosition.x;
-                double exactStartPercent = (exactStartX / m_levelLength) * 100.0;
-
-                // Если стартпоз находится дальше начала уровня — активируем двойной счетчик
-                if (exactStartPercent > 0.01) {
-                    m_fields->startPercent = exactStartPercent;
-                    m_fields->isStartPos = true;
-                }
+            // Если в этот момент дефолтный процент игры равен 0 — значит, мы реально в начале уровня (просто летим с 0%).
+            // Но если дефолтный процент игры > 0 ИЛИ точный процент кубика уже большой — значит, это выбранный стартпоз!
+            if (this->getCurrentPercent() > 0 || currentPercent > 0.5) {
+                m_fields->startPercent = currentPercent; // Намертво фиксируем ПЕРВУЮ часть
+                m_fields->isStartPos = true;             // Включаем двойной счетчик
             }
         }
 
-        // 3. Поиск оригинального текстового лейбла процентов по значку '%'
+        // 2. Быстрый поиск оригинального текстового лейбла процентов по значку '%'
         CCLabelBMFont* percentLabel = nullptr;
         auto uiChildren = m_uiLayer->getChildren();
         if (uiChildren) {
@@ -66,14 +62,14 @@ class $modify(MyPlayLayer, PlayLayer) {
             }
         }
 
-        // 4. Окончательно перерисовываем текст на экране
+        // 3. Выводим текст на экран
         if (percentLabel) {
             std::string formatStr;
             if (m_fields->isStartPos) {
-                // Первая часть взята из точных координат, вторая часть динамически бежит вперед
+                // Тот самый идеальный двойной формат, где первая часть залочена, а вторая бежит
                 formatStr = fmt::format("{:.1f}%-{:.1f}%", m_fields->startPercent, currentPercent);
             } else {
-                // Если стартпоза нет (идем с 0%), выводим обычный точный процент
+                // Обычный точный процент, если стартпоза нет
                 formatStr = fmt::format("{:.1f}%", currentPercent);
             }
             percentLabel->setString(formatStr.c_str());
